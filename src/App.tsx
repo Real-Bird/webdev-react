@@ -1,139 +1,89 @@
-import "bootstrap/dist/css/bootstrap.min.css";
-import { useMemo } from "react";
-import { Container } from "react-bootstrap";
-import { Routes, Route, Navigate } from "react-router-dom";
-import NewNote from "./NewNote";
-import useLocalStorage from "./useLocalStorage";
-import { v4 as uuidV4 } from "uuid";
-import NoteList from "./NoteList";
-import NoteLayout from "./NoteLayout";
-import Note from "./Note";
-import EditNote from "./EditNote";
+import { FormEvent, useState } from "react";
+import { AccountForm } from "./AccountForm";
+import { AddressForm } from "./AddressForm";
+import { useMultistepForm } from "./useMultistepForm";
+import { UserForm } from "./UserForm";
 
-export type Note = {
-  id: string;
-} & NoteData;
-
-export type RawNote = {
-  id: string;
-} & RawNoteData;
-
-export type RawNoteData = {
-  title: string;
-  markdown: string;
-  tagIds: string[];
+type FormData = {
+  firstName: string;
+  lastName: string;
+  age: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  email: string;
+  password: string;
 };
 
-export type NoteData = {
-  title: string;
-  markdown: string;
-  tags: Tag[];
-};
-
-export type Tag = {
-  id: string;
-  label: string;
+const INITIAL_DATA: FormData = {
+  firstName: "",
+  lastName: "",
+  age: "",
+  street: "",
+  city: "",
+  state: "",
+  zip: "",
+  email: "",
+  password: "",
 };
 
 function App() {
-  const [notes, setNotes] = useLocalStorage<RawNote[]>("NOTES", []);
-  const [tags, setTags] = useLocalStorage<Tag[]>("Tags", []);
+  const [data, setData] = useState(INITIAL_DATA);
+  function updateFields(fields: Partial<FormData>) {
+    setData((prev) => {
+      return { ...prev, ...fields };
+    });
+  }
+  const { steps, currentStepIndex, step, isFirstStep, isLastStep, back, next } =
+    useMultistepForm([
+      <UserForm {...data} updateFields={updateFields} />,
+      <AddressForm {...data} updateFields={updateFields} />,
+      <AccountForm {...data} updateFields={updateFields} />,
+    ]);
 
-  const notesWithTags = useMemo(() => {
-    return notes.map((note) => {
-      return {
-        ...note,
-        tags: tags.filter((tag) => note.tagIds.includes(tag.id)),
-      };
-    });
-  }, [notes, tags]);
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    console.log(data);
+    if (!isLastStep) return next();
+    alert("Successful Account Creation");
+  }
 
-  const onCreateNote = ({ tags, ...data }: NoteData) => {
-    setNotes((prevNotes) => {
-      return [
-        ...prevNotes,
-        { ...data, id: uuidV4(), tagIds: tags.map((tag) => tag.id) },
-      ];
-    });
-  };
-  const onUpdateNote = (id: string, { tags, ...data }: NoteData) => {
-    setNotes((prevNotes) => {
-      return prevNotes.map((note) => {
-        if (note.id === id) {
-          return { ...note, ...data, tagIds: tags.map((tag) => tag.id) };
-        } else {
-          return note;
-        }
-      });
-    });
-  };
-  const onDeleteNote = (id: string) => {
-    setNotes((prevNotes) => {
-      return prevNotes.filter((note) => note.id !== id);
-    });
-  };
-
-  const addTag = (tag: Tag) => {
-    setTags((prev) => [...prev, tag]);
-  };
-
-  const updateTag = (id: string, label: string) => {
-    setTags((prevTags) => {
-      return prevTags.map((tag) => {
-        if (tag.id === id) {
-          return { ...tag, label };
-        } else {
-          return tag;
-        }
-      });
-    });
-  };
-
-  const deleteTag = (id: string) => {
-    setTags((prevTags) => {
-      return prevTags.filter((tag) => tag.id !== id);
-    });
-  };
   return (
-    <Container className="my-4">
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <NoteList
-              availableTags={tags}
-              notes={notesWithTags}
-              onUpdateTag={updateTag}
-              onDeleteTag={deleteTag}
-            />
-          }
-        />
-        <Route
-          path="/new"
-          element={
-            <NewNote
-              onSubmit={onCreateNote}
-              onAddTag={addTag}
-              availableTags={tags}
-            />
-          }
-        />
-        <Route path="/:id" element={<NoteLayout notes={notesWithTags} />}>
-          <Route index element={<Note onDeleteNote={onDeleteNote} />} />
-          <Route
-            path="edit"
-            element={
-              <EditNote
-                onSubmit={onUpdateNote}
-                onAddTag={addTag}
-                availableTags={tags}
-              />
-            }
-          />
-        </Route>
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Container>
+    <div
+      style={{
+        position: "relative",
+        background: "white",
+        border: "1px solid black",
+        padding: "2rem",
+        margin: "1rem",
+        borderRadius: ".5rem",
+        fontFamily: "Arial",
+        maxWidth: "max-content",
+      }}
+    >
+      <form onSubmit={onSubmit}>
+        <div style={{ position: "absolute", top: ".5rem", right: ".5rem" }}>
+          {currentStepIndex + 1} / {steps.length}
+        </div>
+        {step}
+        <div
+          style={{
+            marginTop: "1rem",
+            display: "flex",
+            gap: ".5rem",
+            justifyContent: "flex-end",
+          }}
+        >
+          {!isFirstStep && (
+            <button type="button" onClick={back}>
+              Back
+            </button>
+          )}
+          <button type="submit">{isLastStep ? "Finish" : "Next"}</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
